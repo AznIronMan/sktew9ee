@@ -37,7 +37,6 @@ class PhotoWorkerEngine:
                     f"SELECT game_worker_photo_file FROM game_worker_photo_cache "
                     f"WHERE game_worker_name = '{worker_name}'"
                 )
-                # Return just the filename string from the first row
                 if result and len(result) > 0:
                     return result[0]["game_worker_photo_file"]
                 return ""
@@ -78,13 +77,15 @@ class PhotoWorkerEngine:
             raise e
 
     def update_worker_photo_filename(
-        self, worker_name: str, new_filename: str
+        self, worker_name: str, new_filename: str, append_gif: bool = False
     ) -> None:
         """Update the worker photo filename in the cache.
 
         Args:
             worker_name (str): The name of the worker.
             new_filename (str): The new filename to update the worker photo filename to.
+            append_gif (bool, optional): Whether to append .gif if there's no extension.
+            Defaults to False.
 
         Raises:
             Exception: If there is an error updating the worker photo filename.
@@ -96,7 +97,10 @@ class PhotoWorkerEngine:
                 updated_filename = new_filename
                 with Filer() as filer:
                     image_extension = filer.extract_extension(new_filename)
-                    if image_extension is None:
+                    if append_gif and image_extension is None:
+                        updated_filename = f"{new_filename}.gif"
+                        image_extension = "gif"
+                    elif image_extension is None:
                         image_extension = self.settings_manager.get_value(
                             "default_image_extension"
                         )
@@ -104,9 +108,10 @@ class PhotoWorkerEngine:
                             raise Exception(
                                 "Default image extension is not set in settings."
                             )
-                    updated_filename = filer.filepath_formatter(
-                        new_filename, image_extension
-                    )
+                    if not (append_gif and image_extension == "gif"):
+                        updated_filename = filer.filepath_formatter(
+                            new_filename, image_extension
+                        )
                 sqlitedb.execute_write(
                     "UPDATE game_worker_photo_cache SET game_worker_photo_file "
                     "= ? WHERE game_worker_name = ?",
@@ -117,13 +122,16 @@ class PhotoWorkerEngine:
                     "UPDATE tblWorker SET Picture = ? WHERE Name = ?",
                     (updated_filename, worker_name),
                 )
+                sk_log.info(
+                    f"Updated worker {worker_name} with photo: {updated_filename}"
+                )
         except Exception as e:
             sk_log.error(
                 f"PhotoWorkerEngine update_worker_photo_filename error: {e}"
             )
             raise e
 
-    def _build_local_worker_photo_cache(
+    def build_local_worker_photo_cache(
         self, worker_photo_list: List[str]
     ) -> None:
         """Build the local worker photo cache.
@@ -226,7 +234,7 @@ class PhotoWorkerEngine:
             )
             raise e
 
-    def _fetch_worker_photos_from_dir(self) -> List[str]:
+    def fetch_worker_photos_from_dir(self) -> List[str]:
         """Fetch the worker photos from the directory.
 
         Returns:
@@ -294,9 +302,7 @@ class PhotoWorkerEngine:
             from .photo_cache import PhotoCache
 
             with PhotoCache() as photo_cache:
-                worker_photo_list_from_dir = (
-                    self._fetch_worker_photos_from_dir()
-                )
+                worker_photo_list_from_dir = self.fetch_worker_photos_from_dir()
                 if not photo_cache.photo_list_check(worker_photo_list_from_dir):
                     raise Exception("Worker photo list from dir is empty")
                 worker_photo_list_from_db = (
@@ -382,7 +388,7 @@ class PhotoWorkerEngine:
         try:
             self._rebuild_worker_photo_cache()
             worker_dir_list, worker_db_list = self._fetch_worker_photo_lists()
-            self._build_local_worker_photo_cache(worker_dir_list)
+            self.build_local_worker_photo_cache(worker_dir_list)
             self._build_game_worker_photo_cache(worker_db_list)
         except Exception as e:
             sk_log.error(
@@ -501,23 +507,15 @@ class PhotoWorkerEngine:
             Exception: If there is an error refreshing the worker photo cache.
         """
         try:
-            # First check if we can get the local files (this should always work)
-            local_files = self._fetch_worker_photos_from_dir()
+            local_files = self.fetch_worker_photos_from_dir()
             if not local_files:
                 raise Exception("No local worker photo files found")
-
-            # Try to reset the cache (which includes fetching from DB)
             try:
                 self._reset_worker_photo_cache()
             except Exception as reset_error:
-                # If resetting fails, at least update the local files cache
                 sk_log.warning(f"Full cache reset failed: {reset_error}")
-
-                # Rebuild just the local files cache
                 self._rebuild_worker_photo_cache()
-                self._build_local_worker_photo_cache(local_files)
-
-                # Update the cache log
+                self.build_local_worker_photo_cache(local_files)
                 with SQLiteDatabase() as sqlitedb:
                     sqlitedb.insert(
                         "worker_photo_cache_log",
@@ -534,8 +532,6 @@ class PhotoWorkerEngine:
                     "Worker photo cache partially refreshed (local files only)"
                 )
                 return
-
-            # If we got here, the full refresh succeeded
             with SQLiteDatabase() as sqlitedb:
                 sqlitedb.insert(
                     "worker_photo_cache_log",
@@ -547,7 +543,6 @@ class PhotoWorkerEngine:
                     },
                 )
                 sqlitedb.commit()
-
             sk_log.info("Worker photo cache refreshed successfully")
         except Exception as e:
             sk_log.error(

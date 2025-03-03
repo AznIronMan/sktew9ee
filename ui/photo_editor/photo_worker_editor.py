@@ -18,16 +18,11 @@ class PhotoWorkerEditor(WorkerPhotoBase):
     def __init__(self, parent=None) -> None:
         try:
             super().__init__(editor_type="worker", parent=parent)
-
-            # Try to initialize the cache if it's empty
             with PhotoWorkerEngine() as photo_worker_engine:
                 try:
-                    # Check if cache exists and has data
                     photo_worker_engine.worker_photo_cache_init(skip_check=True)
                 except Exception as cache_error:
                     sk_log.warning(f"Cache initialization error: {cache_error}")
-
-            # Now proceed with UI setup
             self.initial_ui_setup()
         except Exception as e:
             sk_log.error(f"PhotoWorkerEditor __init__ error: {e}")
@@ -42,32 +37,26 @@ class PhotoWorkerEditor(WorkerPhotoBase):
         try:
             with PhotoWorkerEngine() as photo_worker_engine:
                 try:
-                    # Try to get both game and local workers from cache
                     game_workers, local_workers = (
                         photo_worker_engine.fetch_worker_photo_cache_lists()
                     )
                 except Exception as e:
-                    # If cache is empty or corrupted, try to rebuild it
                     sk_log.warning(
                         f"Cache fetch error, attempting rebuild: {e}"
                     )
                     photo_worker_engine.refresh_worker_photo_cache()
 
                     try:
-                        # Try again after refresh
                         game_workers, local_workers = (
                             photo_worker_engine.fetch_worker_photo_cache_lists()
                         )
                     except Exception as refresh_error:
-                        # If still failing, use empty lists but don't crash
                         sk_log.error(f"Cache rebuild failed: {refresh_error}")
                         game_workers = []
                         local_workers = []
-
-                        # Try to at least get local files
                         try:
                             local_files = (
-                                photo_worker_engine._fetch_worker_photos_from_dir()
+                                photo_worker_engine.fetch_worker_photos_from_dir()
                             )
                             local_workers = [
                                 {"local_worker_photo_file": f}
@@ -77,11 +66,8 @@ class PhotoWorkerEditor(WorkerPhotoBase):
                             sk_log.error(
                                 f"Local files fetch failed: {local_error}"
                             )
-
-                # Populate lists with whatever data we have
                 self._populate_left_list(game_workers)
                 self._populate_right_list(local_workers)
-
                 self.left_list.setSelectionMode(
                     self.left_list.SelectionMode.SingleSelection
                 )
@@ -113,14 +99,12 @@ class PhotoWorkerEditor(WorkerPhotoBase):
                 )
                 self.checkbox.stateChanged.connect(self._checkbox_state_changed)
                 self.text_input.textChanged.connect(self._text_input_changed)
-                # Connect unselect buttons to their respective methods
                 self.unselect_left_button.clicked.connect(
                     self._unselect_left_button_clicked
                 )
                 self.unselect_right_button.clicked.connect(
                     self._unselect_right_button_clicked
                 )
-                # Connect other buttons
                 self.clear_button.clicked.connect(self._clear_button_clicked)
                 self.transfer_up_button.clicked.connect(
                     self._transfer_up_button_clicked
@@ -135,7 +119,6 @@ class PhotoWorkerEditor(WorkerPhotoBase):
                 self.use_this_button.clicked.connect(
                     self._use_this_button_clicked
                 )
-                # Initialize UI state based on checkbox (which is unchecked by default)
                 self._checkbox_state_changed()
         except Exception as e:
             sk_log.error(f"PhotoWorkerEditor initial_ui_setup error: {e}")
@@ -152,10 +135,8 @@ class PhotoWorkerEditor(WorkerPhotoBase):
         """
         try:
             if not worker_list:
-                # Add a placeholder item if the list is empty
                 self.left_list.addItem("No game workers available")
                 return
-
             for worker in worker_list:
                 self.left_list.addItem(worker["game_worker_name"])
             self.left_list.sortItems()
@@ -174,10 +155,8 @@ class PhotoWorkerEditor(WorkerPhotoBase):
         """
         try:
             if not worker_list:
-                # Add a placeholder item if the list is empty
                 self.right_list.addItem("No local photos available")
                 return
-
             for filename in worker_list:
                 self.right_list.addItem(filename["local_worker_photo_file"])
             self.right_list.sortItems()
@@ -396,13 +375,10 @@ class PhotoWorkerEditor(WorkerPhotoBase):
         try:
             is_checked = self.checkbox.isChecked()
             self.text_input.setEnabled(is_checked)
-
-            # Clear text input if checkbox is unchecked
             if not is_checked:
                 self.text_input.setText("")
                 self.clear_button.setEnabled(False)
                 self.transfer_up_button.setEnabled(False)
-
         except Exception as e:
             sk_log.error(
                 f"PhotoWorkerEditor _checkbox_state_changed error: {e}"
@@ -455,10 +431,10 @@ class PhotoWorkerEditor(WorkerPhotoBase):
                 if filename_to_use == "" or filename_to_use is None:
                     self._clear_button_clicked()
                     return
+                append_gif = self.checkbox.isChecked()
                 photo_worker_engine.update_worker_photo_filename(
-                    self.left_name_label.text(), filename_to_use
+                    self.left_name_label.text(), filename_to_use, append_gif
                 )
-                # Refresh the left list item display
                 self._left_list_item_toggled()
         except Exception as e:
             sk_log.error(
@@ -476,10 +452,8 @@ class PhotoWorkerEditor(WorkerPhotoBase):
         try:
             self.left_list.clearSelection()
             self._left_side_reset()
-            # Also uncheck the checkbox if it's checked
             if self.checkbox.isChecked():
                 self.checkbox.setChecked(False)
-            # Clear the photo display
             self.left_photo.clear()
             self.left_photo.setText("")
         except Exception as e:
@@ -499,7 +473,6 @@ class PhotoWorkerEditor(WorkerPhotoBase):
             self.right_list.clearSelection()
             self._right_side_reset()
             self.right_metadata.setText("")
-            # Clear the photo display
             self.right_photo.clear()
             self.right_photo.setText("")
         except Exception as e:
@@ -672,7 +645,7 @@ class PhotoWorkerEditor(WorkerPhotoBase):
                 except Exception as e:
                     sk_log.warning(f"Could not refresh full cache: {e}")
                     local_files = (
-                        photo_worker_engine._fetch_worker_photos_from_dir()
+                        photo_worker_engine.fetch_worker_photos_from_dir()
                     )
                     local_workers = [
                         {"local_worker_photo_file": f} for f in local_files
@@ -703,18 +676,14 @@ class PhotoWorkerEditor(WorkerPhotoBase):
             selected_item = self.left_list.currentItem()
             if selected_item:
                 worker_name = selected_item.text()
-                _, fileonly_left = self._fetch_photo_from_cache_by_worker_name(
-                    worker_name
-                )
             selected_item = self.right_list.currentItem()
             if selected_item:
-                fileonly_right = selected_item.text()
+                filepath = selected_item.text()
             with PhotoWorkerEngine() as photo_worker_engine:
                 photo_worker_engine.update_worker_photo_filename(
-                    worker_name, fileonly_right
+                    worker_name, filepath
                 )
             self._left_list_item_toggled()
-
         except Exception as e:
             sk_log.error(
                 f"PhotoWorkerEditor _use_this_button_clicked error: {e}"
