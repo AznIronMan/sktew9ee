@@ -15,7 +15,7 @@ class TEWDB:
 
     def _initialize_db(self) -> None:
         """Initialize the appropriate database instance based on settings."""
-        if self.db_mode == "msaccess":
+        if self.db_mode == "msaccess" or self.db_mode == "direct":
             self.db_instance = MSAccessDB()
             self.db_instance.connect()
         elif self.db_mode == "skydbapi":

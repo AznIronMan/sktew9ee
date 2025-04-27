@@ -1,3 +1,4 @@
+import os
 import pyodbc
 
 from settings.settings_file import SettingsManager
@@ -10,13 +11,40 @@ class MSAccessDB:
         self.meal_time = Entree()
         settings = SettingsManager()
         self.tew9_core_path = settings.get_value("tew9_core_path")
-        self.tew9_db_path = settings.get_value("tew9_database_path")
-        self.db_path = f"{self.tew9_core_path}{self.tew9_db_path}"
+        self.tew9_game_database_name = settings.get_value(
+            "tew9_game_database_name"
+        )
+
+        # Check if there's a full path override
+        self.tew9_full_db_path_override = settings.get_value(
+            "tew9_full_db_path_override"
+        )
+
+        if (
+            self.tew9_full_db_path_override
+            and self.tew9_full_db_path_override.strip()
+        ):
+            # Use the override path if provided
+            self.db_path = self.tew9_full_db_path_override
+        else:
+            # Construct path from components: root_path/Databases/database_name/TEW9.mdb
+            # Ensure the path uses consistent separators with os.path.join
+            self.db_path = os.path.normpath(
+                os.path.join(
+                    self.tew9_core_path,
+                    "Databases",
+                    self.tew9_game_database_name,
+                    "TEW9.mdb",
+                )
+            )
+
         self.dinner_time = self.meal_time.whats_for_dinner()
         self.connection = None
 
     def connect(self):
         try:
+            # Log the final database path for debugging
+            sk_log.debug(f"Database path constructed as: {self.db_path}")
             sk_log.info(f"Connecting to MS Access database: {self.db_path}")
             if self.dinner_time:
                 conn_str = (
