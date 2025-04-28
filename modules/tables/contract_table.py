@@ -54,7 +54,6 @@ class ContractFunctions:
         self, columns: List[str]
     ) -> List[Tuple]:
         try:
-            # Validate column names for security
             valid_columns = [
                 "UID",
                 "FedUID",
@@ -64,14 +63,10 @@ class ContractFunctions:
                 "Nickname",
                 "Shortname",
             ]
-
-            # Filter and ensure only valid columns are used
             validated_columns = [col for col in columns if col in valid_columns]
 
             if not validated_columns:
                 raise ValueError("No valid columns provided for the query")
-
-            # Approach 1: Try using direct column names (original approach)
             try:
                 column_str = ", ".join(validated_columns)
                 query = f"SELECT {column_str} FROM tblContract"
@@ -79,12 +74,9 @@ class ContractFunctions:
                 self.contract_table = self.tewdb.select(query)
                 return self.contract_table
             except Exception as e1:
-                # If the direct approach fails, try approach 2 with qualified column names
                 err_msg = f"Direct query failed, trying approach 2: {e1}"
                 sk_log.warning(err_msg)
-
                 try:
-                    # Approach 2: Use qualified column names with square brackets
                     cols_with_brackets = [
                         f"[{col}]" for col in validated_columns
                     ]
@@ -96,23 +88,17 @@ class ContractFunctions:
                     self.contract_table = self.tewdb.select(query)
                     return self.contract_table
                 except Exception as e2:
-                    # If approach 2 fails, try the fallback approach
                     err_msg = (
                         f"Qualified column names failed, trying fallback: {e2}"
                     )
                     sk_log.warning(err_msg)
-
-                    # Approach 3: Fallback to SELECT * with filtering
                     try:
-                        # Use a simple query
                         query = "SELECT * FROM tblContract"
                         debug_msg = (
                             "Selecting all columns and filtering (approach 3)"
                         )
                         sk_log.debug(debug_msg)
                         results = self.tewdb.select(query)
-
-                        # Filter results to include only requested columns
                         filtered_results = []
                         for row in results:
                             filtered_row = {

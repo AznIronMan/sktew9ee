@@ -235,50 +235,81 @@ class PhotoContractEngine:
             )
             raise e
 
+    def _fetch_worker_name_by_uid(self, worker_uid: int) -> str:
+        """Fetch the worker name by UID.
+
+        Args:
+            worker_uid (int): The UID of the worker.
+
+        Returns:
+            str: The name of the worker or "Unknown" if not found.
+        """
+        try:
+            from modules.tables.worker_table import WorkerFunctions
+
+            with WorkerFunctions() as worker_functions:
+                worker_data = worker_functions.fetch_worker_specific_cols(
+                    worker_uid, ["Name"]
+                )
+                if worker_data and len(worker_data) > 0:
+                    return worker_data[0]["Name"]
+                return "Unknown"
+        except Exception as e:
+            sk_log.error(
+                f"PhotoContractEngine _fetch_worker_name_by_uid error: {e}"
+            )
+            return "Unknown"
+
     def fetch_contract_photo_record_cache_lists(
         self,
     ) -> Tuple[List[dict], List[dict]]:
         """Fetch the contract photo record cache lists."""
-        """should be in RecordName[FEDINITIALS][UID] format"""
         try:
             raw_contract_photo_record_list = (
                 self._fetch_contract_photo_record_cache()
             )
             game_contract_record_list = []
             for contract in raw_contract_photo_record_list:
-                contract_recordname = contract["game_contract_recordname"]
                 contract_uid = contract["game_contract_uid"]
                 contract_fedid = contract["game_contract_fedid"]
-                # get fed initials from fed_table.py here
-                # Fix for MS Access parameter issue
+                contract_name = contract["game_contract_recordname"]
+                worker_uid = contract["game_contract_worker_uid"]
+                worker_name = self._fetch_worker_name_by_uid(worker_uid)
+
                 try:
-                    # First try with proper parameter binding
                     fed_initials = self.tewdb.select(
                         "SELECT Initials FROM tblFed WHERE UID = ?",
                         (contract_fedid,),
                     )
                 except Exception as e:
                     sk_log.warning(
-                        f"FedInitials query failed with proper binding: {e}, trying alternative approach"
+                        "FedInitials query failed with proper binding: "
+                        f"{e}, trying alternative approach"
                     )
-                    # Fallback: try with direct embedding (less secure but may work)
                     try:
-                        query = f"SELECT Initials FROM tblFed WHERE UID = {contract_fedid}"
+                        query = (
+                            "SELECT Initials FROM tblFed WHERE UID = "
+                            f"{contract_fedid}"
+                        )
                         fed_initials = self.tewdb.select(query)
                     except Exception as e2:
                         sk_log.error(
-                            f"FedInitials fallback query also failed: {e2}, using placeholder"
+                            "FedInitials fallback query also failed: "
+                            f"{e2}, using placeholder"
                         )
-                        # Provide a placeholder if all else fails
                         fed_initials = [{"Initials": "UNK"}]
 
                 if not fed_initials:
                     sk_log.warning(
-                        f"FedInitials not found for FedUID={contract_fedid}, using placeholder"
+                        "FedInitials not found for FedUID="
+                        f"{contract_fedid}, using placeholder"
                     )
                     fed_initials = [{"Initials": "UNK"}]
 
-                combined_contract_record = f"{contract_recordname}[{fed_initials[0]['Initials']}][{contract_uid}]"
+                combined_contract_record = (
+                    f"{worker_name}[{fed_initials[0]['Initials']}"
+                    f"][{contract_name}][{contract_uid}]"
+                )
                 game_contract_record_list.append(
                     {
                         "game_contract_uid": contract_uid,
@@ -299,7 +330,8 @@ class PhotoContractEngine:
                 return (game_contract_record_list, transformed_local_workers)
             except Exception as e:
                 sk_log.warning(
-                    f"Error fetching local workers from cache: {e}, trying direct directory scan"
+                    "Error fetching local workers from cache: "
+                    f"{e}, trying direct directory scan"
                 )
                 from .photo_worker_engine import PhotoWorkerEngine
 
@@ -387,20 +419,37 @@ class PhotoContractEngine:
     def fetch_contract_photo_filename_from_cache(
         self, contract_name: str
     ) -> str:
-        """Fetch the contract photo filename from the cache."""
+        """Fetch the contract photo filename from the cache.
+
+        Args:
+            contract_name (str): The contract name in format
+                "WorkerName[FED][Name][UID]"
+
+        Returns:
+            str: The filename for the contract photo
+        """
         try:
-            uid_match = re.search(r"\[(\d+)\]", contract_name)
+            uid_match = re.search(r"\[(\d+)\]$", contract_name)
             if not uid_match:
+                sk_log.warning(
+                    f"No UID match found in contract name: {contract_name}"
+                )
                 return ""
             contract_uid = int(uid_match.group(1))
+            sk_log.debug(f"Extracted contract UID: {contract_uid}")
 
             with SQLiteDatabase() as sqlitedb:
-                result = sqlitedb.execute_query(
-                    f"SELECT game_contract_photo_file FROM game_contract_photo_cache "
+                query = (
+                    "SELECT game_contract_photo_file FROM game_contract_photo_cache "
                     f"WHERE game_contract_uid = {contract_uid}"
                 )
+                sk_log.debug(f"Executing query: {query}")
+                result = sqlitedb.execute_query(query)
                 if result and len(result) > 0:
-                    return result[0]["game_contract_photo_file"]
+                    filename = result[0]["game_contract_photo_file"]
+                    sk_log.debug(f"Found photo filename: {filename}")
+                    return filename
+                sk_log.debug(f"No photo found for contract UID: {contract_uid}")
                 return ""
         except Exception as e:
             sk_log.error(
@@ -412,12 +461,23 @@ class PhotoContractEngine:
     def update_contract_photo_filename(
         self, contract_name: str, new_filename: str, append_gif: bool = False
     ) -> None:
-        """Update the contract photo filename in the cache."""
+        """Update the contract photo filename in the cache.
+
+        Args:
+            contract_name (str): The contract name in format
+                "WorkerName[FED][Name][UID]"
+            new_filename (str): The new filename to use
+            append_gif (bool): Whether to append .gif to the filename
+        """
         try:
-            uid_match = re.search(r"\[(\d+)\]", contract_name)
+            uid_match = re.search(r"\[(\d+)\]$", contract_name)
             if not uid_match:
+                sk_log.warning(
+                    f"No UID match found in contract name: {contract_name}"
+                )
                 raise ValueError("Invalid contract name format")
             contract_uid = int(uid_match.group(1))
+            sk_log.debug(f"Extracted contract UID: {contract_uid}")
 
             with SQLiteDatabase() as sqlitedb:
                 from utils.filer import Filer
@@ -457,5 +517,26 @@ class PhotoContractEngine:
         except Exception as e:
             sk_log.error(
                 f"PhotoContractEngine update_contract_photo_filename error: {e}"
+            )
+            raise e
+
+    def _fetch_local_workers_from_cache(self) -> List[dict]:
+        """Fetch the local workers from the cache.
+
+        Returns:
+            List[dict]: List of local workers with keys 'local_worker_uid',
+                'local_worker_photo_file', and 'local_worker_photo_status'
+        """
+        try:
+            with SQLiteDatabase() as sqlitedb:
+                worker_photo_list = sqlitedb.execute_query(
+                    "SELECT * FROM local_worker_photo_cache"
+                )
+                if not worker_photo_list or len(worker_photo_list) == 0:
+                    raise Exception("No local workers found in cache")
+                return [dict(row) for row in worker_photo_list]
+        except Exception as e:
+            sk_log.error(
+                f"PhotoContractEngine _fetch_local_workers_from_cache error: {e}"
             )
             raise e

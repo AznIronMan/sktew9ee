@@ -170,7 +170,6 @@ class SQLiteDatabase:
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders})"
         try:
             self.execute_write(query, tuple(data.values()))
-            # self.lazy_sk_log.debug(f"Inserted row into {table}")
         except sqlite3.Error as e:
             self.lazy_sk_log.error(f"Insert operation failed: {e}")
             raise

@@ -195,21 +195,15 @@ class Filer:
             str: The formatted filepath.
         """
         try:
-            # Convert filepath to Path object if it's a string
             path_obj = Path(filepath) if isinstance(filepath, str) else filepath
-
-            # If no extension provided, just return the filepath as is
             if not extension:
                 return str(filepath)
-
-            # Check if the file already has the correct extension
             if (
                 path_obj.suffix.lower() == f".{extension.lower()}"
                 or path_obj.suffix.lower() == extension.lower()
             ):
                 return str(filepath)
             else:
-                # Add the extension if it's not already there
                 return f"{filepath}.{extension}"
         except Exception as e:
             sk_log.error(f"Filer filepath_formatter error: {e}")
@@ -234,19 +228,14 @@ class Filer:
         try:
             path_obj = Path(filename)
             stripped_filename = path_obj.name
-
-            # If no extension provided, just return the filename as is
             if not extension:
                 return stripped_filename
-
-            # Check if the file already has the correct extension
             if (
                 path_obj.suffix.lower() == f".{extension.lower()}"
                 or path_obj.suffix.lower() == extension.lower()
             ):
                 return stripped_filename
             else:
-                # Add the extension if it's not already there
                 return f"{stripped_filename}.{extension}"
         except Exception as e:
             sk_log.error(f"Filer filename_formatter error: {e}")

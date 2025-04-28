@@ -31,14 +31,6 @@ class PhotoContractEditor(WorkerPhotoBase):
             sk_log.error(f"PhotoContractEditor __init__ error: {e}")
             raise e
 
-    # this is an example of how to populate the left list
-    # def populate_left_list(self) -> None:
-    #     try:
-    #         for i in range(1, 6):
-    #             self.left_list.addItem(str(i))
-    #     except Exception as e:
-    #         sk_log.error(f"PhotoWorkerEditor populate_left_list error: {e}")
-    #         raise e
     def initial_ui_setup(self) -> None:
         """Initialize the UI setup.
 
@@ -171,15 +163,12 @@ class PhotoContractEditor(WorkerPhotoBase):
                 return
 
             for worker in worker_list:
-                # Handle different possible key formats
                 if "local_contract_photo_file" in worker:
                     file_path = worker["local_contract_photo_file"]
                 elif "local_worker_photo_file" in worker:
                     file_path = worker["local_worker_photo_file"]
-                # Handle the case where the worker is just a string
                 elif isinstance(worker, str):
                     file_path = worker
-                # If it's something else, convert to string and log a warning
                 else:
                     sk_log.warning(f"Unexpected worker format: {worker}")
                     file_path = str(worker)
@@ -356,13 +345,26 @@ class PhotoContractEditor(WorkerPhotoBase):
             Tuple[str, str]: The filename and the fileonly.
         """
         try:
+            sk_log.debug(f"Fetching photo for contract name: {contract_name}")
             with PhotoContractEngine() as photo_contract_engine:
                 root_path = photo_contract_engine.worker_photo_path
+                sk_log.debug(f"Worker photo path: {root_path}")
                 fl = photo_contract_engine.fetch_contract_photo_filename_from_cache(
                     contract_name
                 )
+                sk_log.debug(f"Retrieved filename: {fl}")
                 if fl:
-                    return os.path.join(root_path, fl), fl
+                    full_path = os.path.join(root_path, fl)
+                    sk_log.debug(f"Full image path: {full_path}")
+                    if os.path.exists(full_path):
+                        sk_log.debug(f"File exists at: {full_path}")
+                    else:
+                        sk_log.warning(f"File doesn't exist at: {full_path}")
+                    return full_path, fl
+                else:
+                    sk_log.debug(
+                        f"No filename found for contract: {contract_name}"
+                    )
                 return None, None
         except Exception as e:
             sk_log.error(

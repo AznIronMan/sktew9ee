@@ -8,11 +8,18 @@ A PyQt6-based application for enhancing and editing photos for the [Total Extrem
   - **Worker Photos**: Manage photos for regular wrestlers
   - **Alter Ego Photos**: Manage alter ego/gimmick photos
   - **Contract Photos**: Manage contract-specific wrestler photos
+  - **Agers Photos**: Manage agers photos
 - **Photo Cache Management**: Efficiently handle both local and game worker photo caches
 - **Database Integration**: Connects to the game database to read and update worker information
 - **Settings Management**: Comprehensive settings system for application configuration
 
 ## Version History
+
+### Version 0.0.3
+
+- Added functionality to the Agers photo editor
+- Small bug fixes with Alter Ego and Contract photo editors
+- Cleaned up code with comment removal and other small improvements
 
 ### Version 0.0.2
 

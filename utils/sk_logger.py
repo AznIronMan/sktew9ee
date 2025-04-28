@@ -8,7 +8,7 @@ import socket
 import sys
 
 
-DEBUG_ENABLED = os.getenv("DEBUG", "true").lower() == "true"
+DEBUG_ENABLED = os.getenv("DEBUG", "false").lower() == "true"
 
 
 class SKLogger:
@@ -22,22 +22,14 @@ class SKLogger:
         log_dir: str = "./.logs/",
         hostname: str = "default",
     ) -> None:
-        # Force a root logger reset
         logging.root.handlers = []
-
         self.logger = logging.getLogger(name)
-        # Clear any existing handlers
         self.logger.handlers.clear()
         self.logger.propagate = False
-
-        # Set the base logger level to DEBUG to allow all messages
         self.logger.setLevel(logging.DEBUG)
-
         self.hostname = hostname
         self.log_dir = log_dir
-
         if log_cli:
-            # Create CLI handler with explicit stream
             cli_handler = logging.StreamHandler(sys.stdout)
             cli_handler.setLevel(
                 logging.DEBUG if DEBUG_ENABLED else logging.INFO
@@ -45,8 +37,6 @@ class SKLogger:
             formatter = self._create_formatter(use_colors=True, is_cli=True)
             cli_handler.setFormatter(formatter)
             self.logger.addHandler(cli_handler)
-
-            # Verify handler was added
             self.debug("CLI logging initialized")
         if log_file:
             Path(log_dir).mkdir(parents=True, exist_ok=True)
@@ -160,15 +150,13 @@ def use_logger() -> SKLogger:
     if _logger_instance is None:
         hostname = socket.gethostname().split(".")[0].lower()
         _logger_instance = SKLogger(hostname=hostname)
-
-        # Debug logging configuration
-        print("=== Logger Debug Info ===")
-        print(f"Logger level: {_logger_instance.logger.level}")
-        print(f"Handler count: {len(_logger_instance.logger.handlers)}")
-        for idx, handler in enumerate(_logger_instance.logger.handlers):
-            print(f"Handler {idx}: {type(handler)} Level: {handler.level}")
-        print("======================")
-
+        if DEBUG_ENABLED:
+            print("=== Logger Debug Info ===")
+            print(f"Logger level: {_logger_instance.logger.level}")
+            print(f"Handler count: {len(_logger_instance.logger.handlers)}")
+            for idx, handler in enumerate(_logger_instance.logger.handlers):
+                print(f"Handler {idx}: {type(handler)} Level: {handler.level}")
+            print("======================")
     return _logger_instance
 
 
