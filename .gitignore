@@ -186,3 +186,5 @@ run.sh
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+*.sync-conflict*.*
