@@ -5,9 +5,27 @@ A PyQt6-based application for enhancing and editing photos for the [Total Extrem
 ## Features
 
 - **Photo Editor**: Edit and manage worker photos for the Street Kings TEW9 game
+  - **Worker Photos**: Manage photos for regular wrestlers
+  - **Alter Ego Photos**: Manage alter ego/gimmick photos
+  - **Contract Photos**: Manage contract-specific wrestler photos
 - **Photo Cache Management**: Efficiently handle both local and game worker photo caches
 - **Database Integration**: Connects to the game database to read and update worker information
 - **Settings Management**: Comprehensive settings system for application configuration
+
+## Version History
+
+### Version 0.0.2
+
+- Added functionality to the Alter Ego photo editor
+- Added functionality to the Contract photo editor
+- Improved MS Access database compatibility
+- Fixed column name handling for database queries
+
+### Version 0.0.1
+
+- Initial release with basic photo editing functionality
+- Worker photo management
+- Basic database integration
 
 ## Planned Future Features
 

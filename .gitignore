@@ -187,4 +187,8 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# Sync conflict files
+*sync-conflict*
+*.sync-conflict*
+*sync-conflict*.*
 *.sync-conflict*.*
